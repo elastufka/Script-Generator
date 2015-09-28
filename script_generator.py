@@ -76,7 +76,6 @@
 import list_imparameters as li
 import project_info as pi
 import OT_info
-import fill_README
 import os
 import comments as com
 import glob
@@ -91,10 +90,8 @@ import sys
 def get_parameters(project_dict=False, OT_dict=False):
     if project_dict == False:
         project_dict = pi.main()
-	#project_dict = project_info.main()
     if OT_dict == False:
 	OT_dict = OT_info.getOTinfo(project_dict['SB_name'])
-    readme_info = fill_README.getInfo(project_dict, OT_dict)
     XMLroots=OT_dict[1]
     science_root = XMLroots['science_root']
     namespaces = XMLroots['namespaces']
@@ -110,8 +107,6 @@ def get_parameters(project_dict=False, OT_dict=False):
     rfreqHz = li.getRestFreq(science_root, namespaces)
     vwidth = li.getVelWidth(science_root, namespaces, rfreqHz=rfreqHz)
     rframe = li.getRefFrame(science_root, namespaces)
-    #plotcmd = li.genPlotMS(spwdict, rframe)
-    plotcmd = ''
     sg = OT_dict[0]
     sName = li.sourceName(science_root, namespaces, project_dict['SB_name'])
     #mosaic = li.mosaicBool(namespaces, XMLroots['proj_root'], sg['science_goal'])
@@ -120,12 +115,12 @@ def get_parameters(project_dict=False, OT_dict=False):
         pc = li.getPhasecenter(science_root, namespaces)
     else: 
         pc = 'N/A'
-    # get stuff from readme
-    readme_dict = fill_README.getInfo(project_dict, OT_dict)
+
     # fill dictionary
     pc = li.getPhasecenter(science_root, namespaces)
     lastfield = scifld[scifld.rfind(' ')-1:]
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'PI_name': readme_dict['PI_name'],'title': readme_dict['title'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rms': readme_dict['rms'], 'rms_unit': readme_dict['rms_unit'], 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': plotcmd, 'sourceName': sName, 'phasecenter': pc}
+
+parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc}
     return parameters
 
 #########################################
@@ -450,32 +445,7 @@ def write_script(script, project_dict, filename=False):
     imscript.close()
     print '\n\nYour custom ' + filename + ' is in ' + os.getcwd()
 
-def main(project_dict = False, OT_dict = False, comments = True):
-        #if parameters == False:
-    parameters = get_parameters(project_dict=project_dict, OT_dict=OT_dict)
-    print project_dict, parameters
-    newparam = script_data_prep(parameters, project_dict, comments)
-    script = newparam[0]
-    parameters = newparam[1]
-    script = make_continuum(script,parameters, project_dict, comments, flagchannels=False)
-    script = image_setup(script,parameters, comments)
-    script = cont_image(script,parameters, comments)
-    script = contsub(script,parameters, comments)
-    script = line_image(script,parameters, comments)
-    script = pbcor_fits(script)
-    write_script(script, project_dict) # may need to update this
-
-def test_main(SB_name, project_path, comments = True):
-    
-    dictionaries = pi.most_info(SB_name, project_path)    
-    project_dict = dictionaries[0]
-    OT_dict = dictionaries[1]
-    os.chdir(project_path)
-    parameters = get_parameters(project_dict = project_dict, OT_dict = OT_dict) 
-    test = find_threshold(parameters, project_dict)
-    print test
-
-#def generate(SB_name, project_path, comments = True):
+# main method
 def generate(SB_name, project_path = False, comments = True):
     if project_path == False:
         project_path = os.getcwd()    
@@ -497,6 +467,7 @@ def generate(SB_name, project_path = False, comments = True):
         script = line_image(script,parameters, lineinfo, comments)
     script = pbcor_fits(script)
     write_script(script,project_dict, filename = 'scriptForImaging.py')
+    # cleanup temp files
 
 # FOR TESTING ONLY
 if __name__ == "__main__":

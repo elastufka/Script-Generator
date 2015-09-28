@@ -223,11 +223,7 @@ def sort_spws(parameters):
             widthall = widthall + ',' + widthall0
 
     if contspws != '': # continuum subtraction is going to change the indices so fix them here. Yay.
-        if os.path.isdir('calibrated.ms') == True:
-            line_spws_per_eb = len(lineinfo)/factor #line spws per eb
-            #line_spws_per_eb = 2 #TESTING ONLY
-        else:
-            line_spws_per_eb = len(lineinfo) #line spws per eb
+        line_spws_per_eb = len(lineinfo) #line spws per eb
 
         for n in range(0, len(lineinfo)):
             lineinfo[n]['spw_index'] = str(n) # do something clever
@@ -500,7 +496,7 @@ def generate(SB_name, project_path = False, comments = True):
         script = contsub(script,parameters, continfo, linespws, comments)
         script = line_image(script,parameters, lineinfo, comments)
     script = pbcor_fits(script)
-    write_script(script,project_dict, filename = 'scriptForImaging_test.py')
+    write_script(script,project_dict, filename = 'scriptForImaging.py')
 
 # FOR TESTING ONLY
 if __name__ == "__main__":

@@ -105,6 +105,11 @@ def getDictionaries(AOTdir, AOTfile, prop_root, proj_root, science_root, sg, nam
     XMLroots = {'prop_root': prop_root, 'proj_root': proj_root, 'science_root': science_root, 'namespaces': namespaces}
     return OT_dict, XMLroots
 
+def cleanup(AOT):
+    AOTdir = AOT[0:AOT.rfind('/')]
+    os.chdir(AOTdir)
+    os.system('rm -rf temp/')
+
 def getOTinfo(SB_name, AOTpath=False):
     if AOTpath==False:
         AOTpath=getAOT()

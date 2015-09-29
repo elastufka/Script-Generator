@@ -72,16 +72,16 @@
 #	    identical to final_main ... want this to be the final name of the function that is called 
 
 #########################################
+import glob
+import IPython
+import os
+import sys
 
 import list_imparameters as li
 import project_info as pi
 import OT_info
-import os
 import comments as com
-import glob
-import IPython
 import static_commands as sc
-import sys
 
 #####################
 # get the parameter dictionary
@@ -108,6 +108,7 @@ def get_parameters(project_dict=False, OT_dict=False):
     vwidth = li.getVelWidth(science_root, namespaces, rfreqHz=rfreqHz)
     rframe = li.getRefFrame(science_root, namespaces)
     sg = OT_dict[0]
+    AOT = OT_dict[0]['AOT']
     sName = li.sourceName(science_root, namespaces, project_dict['SB_name'])
     #mosaic = li.mosaicBool(namespaces, XMLroots['proj_root'], sg['science_goal'])
     mosaic = li.mosaicBool(namespaces, XMLroots['science_root'], sName)
@@ -120,7 +121,7 @@ def get_parameters(project_dict=False, OT_dict=False):
     pc = li.getPhasecenter(science_root, namespaces)
     lastfield = scifld[scifld.rfind(' ')-1:]
 
-parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc}
+    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
     return parameters
 
 #########################################
@@ -468,6 +469,7 @@ def generate(SB_name, project_path = False, comments = True):
     script = pbcor_fits(script)
     write_script(script,project_dict, filename = 'scriptForImaging.py')
     # cleanup temp files
+    OT_info.cleanup(parameters['AOT'])
 
 # FOR TESTING ONLY
 if __name__ == "__main__":

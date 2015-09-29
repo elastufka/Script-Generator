@@ -116,21 +116,12 @@ def getnum_ms(project_type, project_path):
     if not vislist:
         vislist = glob.glob('calibrated.ms')
     nms = len(vislist)
-    return nms;
-'''
+    return nms
+
 def getListobs():
     variables=subprocess.Popen([ "casa"," -c", " /lustre/naasc/elastufk/Python/casa_stuff.py"], shell=False,         stdout=subprocess.PIPE, stderr=subprocess.STDOUT) 
     variables.wait()
     stuff = variables.communicate()
-    lines = stuff[0].split('\n')
-    index = len(lines)-4
-    return lines, index
-'''
-def getListobs():
-    variables=subprocess.Popen([ "casa"," -c", " /lustre/naasc/elastufk/Python/casa_stuff.py"], shell=False,         stdout=subprocess.PIPE, stderr=subprocess.STDOUT) 
-    variables.wait()
-    stuff = variables.communicate()
-    print 'done'
     lines = stuff[0].split('\n')
     for line in lines:
         if line.startswith('Median OBSERVE_TARGET'):
@@ -143,27 +134,9 @@ def getListobs():
             pass
     except UnboundLocalError:
         sys.exit('something went wrong with CASA!')
-
     return lines, index
-# get number of spws, science fields, and cell size while we're at it.
-'''
-def getNspw(lines, index):
-    n = index -1
-    nspws = lines[n] # stuff in [] one line up from sfields.
-    # fix for large mosaics
-    while nspws[0] != '[': # changed from nspws[1] != '0' .... why was it that way?
-        n = n-1
-        nspws = lines[n]
-    IPython.embed()
-    nspws = nspws[1:-1].strip() # get rid of the [ ]
-    nspws = nspws.replace('  ', ',') # separate with commas
-    nspws = nspws.replace(' ', ',') # separate with commas
-    # turn into an integer vector
-    spws = map(int,nspws.split(','))
-    numspws = len(spws)
 
-    return numspws, spws
-'''
+# get number of spws, science fields, and cell size while we're at it.
 def getNspw(lines, index):
     nspws = lines[index + 1] # stuff in the line after Median OBSERVE_TARGET frequency = 343.463 GHz 
     nspws = nspws[1:-1].strip() # get rid of the [ ]
@@ -172,7 +145,6 @@ def getNspw(lines, index):
     # turn into an integer vector
     spws = map(int,nspws.split(','))
     numspws = len(spws)
-
     return numspws, spws
 
 def getCell(lines): #will this be true for multiple executions?
@@ -192,9 +164,7 @@ def getScienceFields(lines, index):
     sfields = sfields[1:-1].strip()
     sfields = sfields.replace('  ',',')
     sfields = sfields.replace(' ',',')
-
     return sfields
-
 
 # get relevant lines from the text files
 def getLines(index, numspws):
@@ -209,7 +179,6 @@ def getLines(index, numspws):
         specinfo.append(listtext[index:index+numspws+2])
         specinfo.append('\n')
         text.close()
-
     return specinfo
 
 # spw info 
@@ -217,14 +186,6 @@ def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw di
     spwprint = 'You have no continuum-dedicated spws. \n' # default
     #get the right 'SpectralSpec' block...don't want the pointing one! <sbl:name>HCN v=0 J=1-0 Science setup_1</sbl:name>
     spectralspec = science_root.findall('.//sbl:SpectralSpec/', namespaces)
-    '''
-[<Element '{Alma/ObsPrep/SchedBlock}name' at 0x29ae890>,
- <Element '{Alma/ObsPrep/SchedBlock}ACACorrelatorConfiguration' at 0x29ae8d0>,
- <Element '{Alma/ObsPrep/SchedBlock}FrequencySetup' at 0x29b6750>,
- <Element '{Alma/ObsPrep/SchedBlock}name' at 0x29b9310>,
- <Element '{Alma/ObsPrep/SchedBlock}ACACorrelatorConfiguration' at 0x29b9390>,
- <Element '{Alma/ObsPrep/SchedBlock}FrequencySetup' at 0x29c1390>]
-    '''
 
     for n in range(0, len(spectralspec)): # don't want to get the pointing setup instead!
         if 'Science setup' in spectralspec[n].text:
@@ -274,7 +235,6 @@ def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw di
             else: 
                 transition= spwtype[n].text # it's a line with this transition
         spwdict.append({'index': n, 'type': spwtype[n].text, 'nchan': nchan, 'restfreq': spwrfreq[n].text, 'transition': transition})
-    #print spwdict
     return spwdict
 
 # get rest frequency
@@ -367,29 +327,12 @@ def mosaicBool(namespaces, science_root, sourceName):
         if sourceName == sourcenames[n].text:
             mosaic = sources[n].findall('sbl:PointingPattern/sbl:isMosaic',namespaces)
             mosaicbool = mosaic[0].text
-
-    IPython.embed()
-    #sci_goal = goals[int(sg)] # won't work for a spectral scan! have to use the name for that one....
-    #sp = sci_goal.findall('prj:TargetParameters/prj:SinglePoint',namespaces)
-    #ismosaic = sci_goal.findall('prj:TargetParameters/prj:isMosaic',namespaces)
-
-    #if not sp:
-    #if ismosaic[0].text == 'true':
-    #    mosaicbool = 'true'
-    #elif ismosaic[0].text == 'true':
-    #    mosaicbool = 'false'
-    #    print 'WARNING: OT designates target as mosaic, but only a single pointing is found. Please check results carefully! imagermode will be set to "csclean" for the time being.'
-    #else:
-    #   mosaicbool = 'false'
     return mosaicbool
 
-def ismosaic(projroot, namespaces, sg,lastfield, firstfield): # fix this using mosaicbool
-    mosaic = projroot.findall('.//prj:ScienceGoal/prj:TargetParameters/prj:SinglePoint',namespaces)
-    if mosaic != [] :
+def ismosaic(mosaicbool,lastfield, firstfield): # fix this using mosaicbool
+    if mosaicbool == 'true' :
         isMosaic = ''
         pointings = 'with ' + str(int(firstfield) - int(lastfield)) + ' pointings (fields ' + lastfield + '~' + firstfield + ' ). Use imagermode="mosaic".' # number of pointings - same as number of fields if it's a mosaic I guess
-        #coords = projroot.findall('.//prj:ScienceGoal/prj:TargetParameters/prj:Rectangle/prj:centre',namespaces) #! what if it's a custom mosaic??
-        #! get nearest matching field ID ... from ze listobs?
     else:
         isMosaic = 'not'
         pointings = 'so use imagermode="csclean". \n The science field index is ' + firstfield
@@ -409,34 +352,6 @@ def getPhasecenter(science_root, namespaces):
             break
 
     phasecenter = system[n].attrib['system'] + ' ' + sourceCoords[0] + coordUnits[0] + ' ' + sourceCoords[1] + coordUnits[1]
-
-    '''
-    if coordUnits == ['deg', 'deg']:
-        # convert to RA and dec
-        sourceCoords[0]
-        
-    # read phase center coordinates for all the pointings and figure out which one is closest 
-    os.chdir('%s/sg_ouss_id/group_ouss_id/member_ouss_id/calibrated' % project_dict['project_path']) # place where the listobs is
-  
-    listobsfiles = glob.glob('*.listobs.txt')
-    lo = listobsfiles[0]
-    listobs = open(lo, 'r')
-    lines = listobs.readlines()
-    listobs.close()
-   
-    deltaRA = []
-    deltaDec = []
-    for line in lines:
-        if sourceName in line: # hopefully this works!
-
-            deltaRA.append(abs(sourceCoords[0] - line[32:47]))
-            deltaDec.append(abs(sourceCoords[1] - line[48:63]))
-            IPython.embed()
-    if deltaRA.index(deltaRA.argmin()) == deltaDec.index(deltaDec.argmin()):
-         phasecenter = int(deltaRA.index(deltaRA.argmin())) + int(firstfield)
-    #else: # figure out something else 
-    IPython.embed()
-    '''
     return phasecenter
  
 def sourceName(science_root, namespaces, SB_name):
@@ -488,7 +403,7 @@ def fillInfo(p): #pass the whole dictionary
     #! print science field(s) somewhere
     info.append('This is ' + p['mosaic'] + ' a mosaic ' + p['pointings'] +'\n')
     info.append('The phasecenter coordinates are: ' + p['phasecenter'])
-    #info.append('The science field indexes are: ' + sfields + '\n') # print science field(s) somewhere
+    info.append('The science field indexes are: ' + p['scifields'] + '\n') # print science field(s) somewhere
     info.append('Recommended cell and image sizes are: \n' + p['cellsize'] + '	' + '[' + p['imsize'] + ',' + p['imsize'] + '] \n')
 
     info.append('\n')
@@ -503,9 +418,9 @@ def fillInfo(p): #pass the whole dictionary
         info.append(p['spw_dict'][n]['transition'] + '      ' + p['spw_dict'][n]['nchan']+ '	'+ p['spw_dict'][n]['restfreq'] + '\n') 
 
     info.append('\n')
-    info.append('Here are some plotms commands to help you find the appropriate start velocity and number of channels: '+ '\n')
-    for n in range(0,len(p['plotcmd'])):
-        info.append(p['plotcmd'][n]+ '\n')
+    #info.append('Here are some plotms commands to help you find the appropriate start velocity and number of channels: '+ '\n')
+    #for n in range(0,len(p['plotcmd'])):
+    #    info.append(p['plotcmd'][n]+ '\n')
 
     info.append('\n')
     info.append('Try to meet the requested line rms of ' + p['rms'] + ' '+ p['rms_unit'])
@@ -517,108 +432,8 @@ def writeText(param, info):
 
 #######################
 
-def testmain():
-    print 'testing'
-    
-    project_dict = {'SB_name': 'NGC6357__a_03_7M',
- 'alias_tgz': '2013.1.01391.S.MOUS.uid___A001_X147_X27e.SBNAME.NGC6357__a_03_7M.tgz',
- 'asdm': ['uid://A002/X9e0695/X7fd8',
-  'uid://A002/X9dcf39/X3484',
-  'uid://A002/X9dcf39/X3085'],
- 'mous_code': 'uid___A001_X147_X27e',
- 'number_asdms': 3,
- 'pipeline_path': '/lustre/naasc/pipeline/pipeline_env_r31667_casa422_30986.sh',
- 'project_number': '2013.1.01391.S',
- 'project_path': '/lustre/naasc/elastufk/Imaging/testscript',
- 'project_type': 'Imaging'}
-    '''
-    project_dict = {'SB_name': 'Arp220_a_07_TE',
-  'alias_tgz': 'N/A',
-  'asdm': ['N/A'],
-  'mous_code': 'N/A',
-  'number_asdms': 1,
-  'pipeline_path': 'N/A',
-  'project_number': '2013.1.00099.S',
-  'project_path': '/lustre/naasc/elastufk/testscript/',
-  'project_type': 'Imaging'}
-
-    
-    OT_dict = [{'AOT': '/lustre/naasc/elastufk/Imaging/2013.1.00099.S_v2.aot',
-   'AOTdir': '/lustre/naasc/elastufk/Imaging',
-   'AOTfile': '2013.1.00099.S_v2.aot',
-   'science_goal': '1',
-   'tempdir': '/lustre/naasc/elastufk/Imaging/temp'},
-  {'namespaces': {'prj': 'Alma/ObsPrep/ObsProject',
-    'prp': 'Alma/ObsPrep/ObsProposal',
-    'sbl': 'Alma/ObsPrep/SchedBlock',
-    'val': 'Alma/ValueTypes'}, 
-   'proj_root': <Element '{Alma/ObsPrep/ObsProject}ObsProject' at 0x3537550>,
-   'prop_root': <Element '{Alma/ObsPrep/ObsProposal}ObsProposal' at 0x3104e10>,
-   'science_root': <Element '{Alma/ObsPrep/SchedBlock}SchedBlock' at 0x3a6cbd0>}]
-    '''
-    
-    AOT='/lustre/naasc/elastufk/ManualReduction/2013.1.01391.S_v3.aot'
-    #AOT='/lustre/naasc/elastufk/Imaging/2013.1.00099.S_v2.aot'
-    OT_dict = OT_info.getOTinfo(project_dict['SB_name'], AOTpath=AOT)
-    #readme_info = fill_README.getInfo(project_dict, OT_dict)
-    XMLroots=OT_dict[1]
-    science_root = XMLroots['science_root']
-    namespaces = XMLroots['namespaces']
-
-
-    #listobs = getListobs()
-    #line = listobs[0]
-    #index = listobs[1]
-    #print line, index
-    #scifld = getScienceFields(line, index)
-    sn = sourceName(science_root, namespaces)
-    pc = getPhasecenter(science_root, namespaces)
-    print pc
-    '''
-    nms = getnum_ms(project_dict['project_type'], project_dict['project_path'])
-    listobs = getListobs()
-    line = listobs[0]
-    index = listobs[1]
-    #print line, index
-    nspws = getNspw(line, index)
-    cell = getCell(line, index)
-    #print cell
-    scifld = getScienceFields(line, index)
-    #print scifld
-    specinfo = getLines(index, int(nspws[0]))
-    spwinfo = getSpwInfo(science_root, namespaces, nspws[1])
-    #print spwinfo
-    rfreqHz = getRestFreq(science_root, namespaces)
-    #print rfreqHz
-    vwidth = getVelWidth(science_root, namespaces, rfreqHz=rfreqHz)
-    #print vwidth
-    rframe = getRefFrame(science_root, namespaces)
-    #print rframe
-    #print linefreq
-    plotcmd = genPlotMS(spwinfo, rframe)
-    #print plotcmd
-    sg = OT_dict[0]
-    mosaic = ismosaic(XMLroots['proj_root'], namespaces, sg['science_goal'], scifld[0], scifld[1])
-    #print mosaic
-    # get stuff from readme
-    readme_dict = fill_README.getInfo(project_dict, OT_dict)
-    # fill dictionary
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'PI_name': readme_dict['PI_name'],'title': readme_dict['title'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic[0], 'pointings': mosaic[1], 'scifield0': scifld[0], 'scifield1': scifld[1], 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe,  'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwinfo, 'plotcmd': plotcmd, 'rms': readme_dict['rms'], 'rms_unit': readme_dict['rms_unit'], 'rfreq':str(float(rfreqHz)*1e-9)}
-    print parameters
-    param = openFile()
-    info = fillInfo(parameters)
-    writeText(param, info)
-
-    # remove temp files
-    fill_README.cleanup(OT_dict[0]['tempdir'])
-    '''
-def main(project_dict=False, OT_dict=False):
-    #if project_dict == False:
-    #    project_dict = project_info.main()
-    #if OT_dict == False:
-    #    OT_dict = OT_info.getOTinfo(project_dict['SB_name'])
- 
-    dictionaries = project_info.most_info(SBname = 'NGC_1068_a_07_TE', wd = '/lustre/naasc/elastufk/Reduce_00014/sg_ouss_id/group_ouss_id/member_ouss_id/calibrated', mous_code = False)
+def main(SB_name = False, project_path = False): 
+    dictionaries = project_info.most_info(SBname = SB_name, project_path = project_path)
     OT_dict = dictionaries[1]
     project_dict = dictionaries[0]
     #readme_info = fill_README.getInfo(dictionaries[0], OT_dict)
@@ -642,18 +457,22 @@ def main(project_dict=False, OT_dict=False):
     #plotcmd = genPlotMS(spwinfo, rframe)
     plotcmd = ''
     sg = OT_dict[0]
-    mosaic = ismosaic(XMLroots['proj_root'], namespaces, sg['science_goal'], scifld[0], scifld[len(scifld)-1])
     sName = sourceName(science_root, namespaces, project_dict['SB_name'])
-
+    mbool = mosaicBool(namespaces, science_root, sName)
+    mosaic = ismosaic(mbool, scifld[0], scifld[scifld.rfind(' ')-1:])
+    if mbool == 'true':
+        pc = getPhasecenter(science_root, namespaces)
+    else: 
+        pc = 'N/A'
     # get stuff from readme
     readme_dict = fill_README.getInfo(dictionaries[0], OT_dict)
 
     # fill dictionary
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'PI_name': readme_dict['PI_name'],'title': readme_dict['title'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic[0], 'pointings': mosaic[1], 'scifields': scifld, 'scifield0': scifld[0], 'scifield1': scifld[len(scifld)-1], 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe,  'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwinfo, 'plotcmd': plotcmd, 'rms': readme_dict['rms'], 'rms_unit': readme_dict['rms_unit'], 'rfreq':str(float(rfreqHz)*1e-9), 'phasecenter': pc}
+    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'PI_name': readme_dict['PI_name'],'title': readme_dict['title'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic[0], 'pointings': mosaic[1], 'scifields': scifld, 'scifield0': scifld[0], 'scifield1': scifld[scifld.rfind(' ')-1:], 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe,  'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwinfo, 'plotcmd': plotcmd, 'rms': readme_dict['rms'], 'rms_unit': readme_dict['rms_unit'], 'rfreq':str(float(rfreqHz)*1e-9), 'phasecenter': pc}
     param = openFile()
     info = fillInfo(parameters) #! re-work this one too
     writeText(param, info)
-
+    print 'The file imaging_parameters.txt is now in %s' % os.getcwd()
     # remove temp files
     fill_README.cleanup(OT_dict[0]['tempdir'])   
 

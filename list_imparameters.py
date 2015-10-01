@@ -303,7 +303,6 @@ def genPlotMS(spwinfo, rframe, spw):
 # mosaic? 
 def mosaicBool0riginal(namespaces, projroot,sg):   
     goals = projroot.findall('.//prj:ScienceGoal',namespaces)
-    IPython.embed()
     sci_goal = goals[int(sg)] # won't work for a spectral scan! have to use the name for that one....
     sp = sci_goal.findall('prj:TargetParameters/prj:SinglePoint',namespaces)
     ismosaic = sci_goal.findall('prj:TargetParameters/prj:isMosaic',namespaces)
@@ -433,6 +432,8 @@ def writeText(param, info):
 #######################
 
 def main(SB_name = False, project_path = False): 
+    if project_path = False:
+        project_path = os.getcwd()
     dictionaries = project_info.most_info(SBname = SB_name, project_path = project_path)
     OT_dict = dictionaries[1]
     project_dict = dictionaries[0]

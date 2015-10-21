@@ -238,7 +238,7 @@ def sort_spws(parameters):
         contspws =  spwall + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n" #maybe put this somewhere else...
 
     continfo = {'cont_index': contspws, 'width': width, 'widthall': widthall, 'spwall': spwall}
-    IPython.embed()
+
     return continfo, lineinfo, linespw
 
 #########################################

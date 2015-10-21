@@ -235,7 +235,7 @@ def sort_spws(parameters):
 
     if width == '': # if no continuum-dedicated spws, just put all of them in the arguments and add a comment to contspws:
         width = widthall
-        contspws =  spwall + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n"
+        contspws =  spwall + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n" #maybe put this somewhere else...
 
     continfo = {'cont_index': contspws, 'width': width, 'widthall': widthall, 'spwall': spwall}
 
@@ -309,7 +309,7 @@ def make_continuum(script, parameters, project_dict, continfo, comments, flagcha
         splitcomplete = sc.splitcont()  + "      width=[" + width + "], # widths for all the spws are [" + widthall + "]\n      datacolumn='data')\n\n"
     else: # use all the spws, not just continuum-dedicated:
         flagchannels = "flagchannels = '" + flagchannels + "'\n\n"
-        contspws = "contspws = '" + spwall + "'\n"
+        contspws = "contspws = '" + spwall + "\n"
         splitcomplete = sc.splitcont()  + "      width=[" + widthall + "], # widths for all the spws are [" + widthall + "]\n      datacolumn='data')\n\n"
 
     # 4.4 fixes....
@@ -320,6 +320,7 @@ def make_continuum(script, parameters, project_dict, continfo, comments, flagcha
         script = script + contspws + initweights + sc.flags() + flagchannels + sc.flagdata() + sc.plotspw() + sc.contvis() + splitcomplete + sc.flagrestore() + checkweights + sc.plotuv()
     else:
         script = script + contspws + sc.flags() + flagchannels + sc.flagdata() + sc.contvis() + splitcomplete + sc.flagrestore() + sc.plotuv()
+
 
     return script
 
@@ -453,7 +454,7 @@ def write_script(script, project_dict, filename=False):
 def generate(SB_name, project_path = False, comments = True):
     if project_path == False:
         project_path = os.getcwd()    
-    dictionaries = pi.most_info(SB_name, project_path)    
+    dictionaries = pi.most_info(SB_name, project_path=project_path)    
     project_dict = dictionaries[0]
     OT_dict = dictionaries[1]
     os.chdir(project_path)
@@ -470,7 +471,7 @@ def generate(SB_name, project_path = False, comments = True):
         script = contsub(script,parameters, continfo, linespws, comments)
         script = line_image(script,parameters, lineinfo, comments)
     script = pbcor_fits(script)
-    write_script(script,project_dict, filename = 'scriptForImaging.py')
+    write_script(script,project_dict, filename = 'scriptForImaging_test.py')
     # cleanup temp files
     OT_info.cleanup(parameters['AOT'])
 

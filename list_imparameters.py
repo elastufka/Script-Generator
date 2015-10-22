@@ -229,12 +229,14 @@ def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw di
         for i in range(0,len(kw)):
             if kw[i] in spwtype[n].text: 
                 transition = 'continuum'
+                break
             elif spwtype[n].text == 'Spec__Scan_': #panic
                 spwprint = 'This is a spectral scan ... good luck' + '\n'
                 transition = 'Spectral Scan'
             else: 
                 transition= spwtype[n].text # it's a line with this transition
         spwdict.append({'index': n, 'type': spwtype[n].text, 'nchan': nchan, 'restfreq': spwrfreq[n].text, 'transition': transition})
+        #IPython.embed()
     return spwdict
 
 # get rest frequency
@@ -432,7 +434,7 @@ def writeText(param, info):
 #######################
 
 def main(SB_name = False, project_path = False): 
-    if project_path = False:
+    if project_path == False:
         project_path = os.getcwd()
     dictionaries = project_info.most_info(SBname = SB_name, project_path = project_path)
     OT_dict = dictionaries[1]

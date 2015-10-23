@@ -77,7 +77,7 @@ import IPython
 import os
 import sys
 
-import list_imparameters as li
+import list_imparameters_CASA as li
 import project_info as pi
 import OT_info
 import comments as com
@@ -96,22 +96,21 @@ def get_parameters(project_dict=False, OT_dict=False):
     science_root = XMLroots['science_root']
     namespaces = XMLroots['namespaces']
     nms = li.getnum_ms(project_dict['project_type'], project_dict['project_path'])
-    listobs = li.getListobs()
-    line = listobs[0]
-    index = listobs[1]
-    nspws = li.getNspw(line, index)
-    cell = li.getCell(line)
-    scifld = li.getScienceFields(line, index)
-    specinfo = li.getLines(index, int(nspws[0]))
-    spwdict = li.getSpwInfo(science_root, namespaces, nspws[1])
+    exec li.getVishead()
+    stuff=getVishead()
+    nspws = stuff[0]
+    scifld=stuff[1]
+    cell = stuff[2]
+    spwdict = li.getSpwInfo(science_root, namespaces, nspws)
     rfreqHz = li.getRestFreq(science_root, namespaces)
     vwidth = li.getVelWidth(science_root, namespaces, rfreqHz=rfreqHz)
     rframe = li.getRefFrame(science_root, namespaces)
     sg = OT_dict[0]
     AOT = OT_dict[0]['AOT']
     sName = li.sourceName(science_root, namespaces, project_dict['SB_name'])
-    #mosaic = li.mosaicBool(namespaces, XMLroots['proj_root'], sg['science_goal'])
-    mosaic = li.mosaicBool(namespaces, XMLroots['science_root'], sName)
+    #mosaic = li.mosaicBoolOriginal(namespaces, XMLroots['proj_root'], sg['science_goal'])
+    #mosaic = li.mosaicBool(namespaces, XMLroots['science_root'], sName)
+    mosaic = 'false'
     if mosaic == 'true':
         pc = li.getPhasecenter(science_root, namespaces)
     else: 
@@ -119,9 +118,9 @@ def get_parameters(project_dict=False, OT_dict=False):
 
     # fill dictionary
     pc = li.getPhasecenter(science_root, namespaces)
-    lastfield = scifld[scifld.rfind(' ')-1:]
+    lastfield = scifld[len(scifld)]
 
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms, 'specinfo':specinfo,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
+    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
     return parameters
 
 #########################################
@@ -476,6 +475,6 @@ def generate(SB_name, project_path = False, comments = True):
     OT_info.cleanup(parameters['AOT'])
 
 # FOR TESTING ONLY
-if __name__ == "__main__":
-    generate('NGC_1068_a_07_TE','/lustre/naasc/elastufk/Reduce_00014', comments = False)
+#if __name__ == "__main__":
+#    generate('NGC_1068_a_07_TE','/lustre/naasc/elastufk/Reduce_00014', comments = False)
 

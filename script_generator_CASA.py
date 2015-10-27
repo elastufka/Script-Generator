@@ -73,10 +73,9 @@
 
 #########################################
 import glob
-import IPython
 import os
 import sys
-
+import numpy as np
 import list_imparameters_CASA as li
 import project_info as pi
 import OT_info
@@ -96,10 +95,10 @@ def get_parameters(project_dict=False, OT_dict=False):
     science_root = XMLroots['science_root']
     namespaces = XMLroots['namespaces']
     nms = li.getnum_ms(project_dict['project_type'], project_dict['project_path'])
-    exec li.getVishead()
-    stuff=getVishead()
+    stuff=li.getNumbers()
     nspws = stuff[0]
-    scifld=stuff[1]
+    scifld=stuff[1].tolist()
+    print scifld
     cell = stuff[2]
     spwdict = li.getSpwInfo(science_root, namespaces, nspws)
     rfreqHz = li.getRestFreq(science_root, namespaces)
@@ -108,9 +107,7 @@ def get_parameters(project_dict=False, OT_dict=False):
     sg = OT_dict[0]
     AOT = OT_dict[0]['AOT']
     sName = li.sourceName(science_root, namespaces, project_dict['SB_name'])
-    #mosaic = li.mosaicBoolOriginal(namespaces, XMLroots['proj_root'], sg['science_goal'])
-    #mosaic = li.mosaicBool(namespaces, XMLroots['science_root'], sName)
-    mosaic = 'false'
+    mosaic = li.mosaicBool(namespaces, XMLroots['science_root'], sName)
     if mosaic == 'true':
         pc = li.getPhasecenter(science_root, namespaces)
     else: 
@@ -118,9 +115,9 @@ def get_parameters(project_dict=False, OT_dict=False):
 
     # fill dictionary
     pc = li.getPhasecenter(science_root, namespaces)
-    lastfield = scifld[len(scifld)]
+    lastfield = scifld[len(scifld)-1]
 
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': scifld,'scifield0': scifld[0], 'scifield1': lastfield, 'cellsize': cell[0], 'imsize':cell[1], 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
+    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': scifld,'scifield0': str(scifld[0]), 'scifield1': str(lastfield), 'cellsize': cell[0], 'imsize':str(cell[1]), 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
     return parameters
 
 #########################################
@@ -220,24 +217,24 @@ def sort_spws(parameters):
     if contspws != '': # continuum subtraction is going to change the indices so fix them here. Yay.
         line_spws_per_eb = len(lineinfo) #line spws per eb
 
-        for n in range(0, len(lineinfo)):
-            lineinfo[n]['spw_index'] = str(n) # do something clever
-            try:
-                if factor: #multiple eb's ... this might be an unbound local error in case of single eb, test.
-                    for j in range(1, factor):
-                        lineinfo[n]['spw_index'] = lineinfo[n]['spw_index'] + ',' + str(n + line_spws_per_eb*j)
-            except UnboundLocalError:
-                pass
-            # update plotms commands
-            lineinfo[n]['plotcmd'] = li.genPlotMS(lineinfo[n], parameters['rframe'], lineinfo[n]['spw_index'])
-            lineinfo[n]['restfreq'] = "restfreq = '" + lineinfo[n]['restfreq'] + "GHz'\n"
+    for n in range(0, len(lineinfo)):
+        lineinfo[n]['spw_index'] = str(n) # do something clever
+        try:
+            if factor: #multiple eb's ... this might be an unbound local error in case of single eb, test.
+                for j in range(1, factor):
+                    lineinfo[n]['spw_index'] = lineinfo[n]['spw_index'] + ',' + str(n + line_spws_per_eb*j)
+        except UnboundLocalError:
+            pass
+        # update plotms commands
+        lineinfo[n]['plotcmd'] = li.genPlotMS(lineinfo[n], parameters['rframe'], lineinfo[n]['spw_index'])
+        lineinfo[n]['restfreq'] = "restfreq = '" + lineinfo[n]['restfreq'] + "GHz'\n"
 
     if width == '': # if no continuum-dedicated spws, just put all of them in the arguments and add a comment to contspws:
         width = widthall
-        contspws =  spwall + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n" #maybe put this somewhere else...
+        contspws =  spwall #+ "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n" #maybe put this somewhere else...
 
     continfo = {'cont_index': contspws, 'width': width, 'widthall': widthall, 'spwall': spwall}
-
+    print continfo, lineinfo, linespw
     return continfo, lineinfo, linespw
 
 #########################################
@@ -265,37 +262,42 @@ def script_data_prep(parameters, project_dict, comments):
         script = script + com.pointing() + sc.pointing_table()
 
     # to concat or not concat?
-    if parameters['nms'] > 1:
+    if (project_dict['project_type'] == 'Imaging' and parameters['nms'] > 1):
         if comments == False: 
             script = script + com.combine_header() + sc.concat_setup() +com.split()  + multipleex + vishead + sc.split_science() + sc.checksplit() 
         else:
             script = script + com.combine() + sc.concat_setup() +com.split() +  multipleex + vishead + com.vishead() + sc.split_science() + com.check_split() + sc.checksplit() 
-  
-    os.chdir(project_dict['project_path'])
-    if project_dict['project_type'] == 'Manual':
+    elif project_dict['project_type'] == 'Manual':
+        os.chdir(project_dict['project_path'])
         os.chdir('Imaging')
         if  os.path.isdir('calibrated.ms') == True: # need concatvis = 'calibrated.ms' but no split
             if comments == False: 
                 script = script + com.split() + multipleex + vishead + sc.split_science() + sc.checksplit() 
             else:
                 script = script + com.split()+ multipleex + vishead + com.vishead() + sc.split_science() + com.check_split() + sc.checksplit() 
+        else:
+            if comments == False:
+                script = script + com.split() + singleex + vishead + sc.split_science() + sc.checksplit() 
+            else:
+                script = script + com.split() + singleex + vishead + com.vishead() + sc.split_science() + com.check_split() + sc.checksplit() 
         os.chdir('../')
-
-    else: # you only have one EB!
+    else:
         if comments == False:
             script = script + com.split() + singleex + vishead + sc.split_science() + sc.checksplit() 
         else:
              script = script + com.split() + singleex + vishead + com.vishead() + sc.split_science() + com.check_split() + sc.checksplit() 
-  
-    #if you need to regrid your velocities... build this in later
 
+    #if you need to regrid your velocities... build this in later
     script = script + com.backup() + noregrid + backup
     return script
 
 def make_continuum(script, parameters, project_dict, continfo, comments, flagchannels=False):
     width = continfo['width']
     widthall = continfo['widthall']
-    contspws = "contspws = '" + continfo['cont_index'] + "'\n"
+    if continfo['cont_index'] == continfo['spwall']:
+        contspws = "contspws = '" + continfo['cont_index'] + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n"
+    else:
+        contspws = "contspws = '" + continfo['cont_index'] + "'\n"
     spwall = continfo['spwall']
 
     if comments == False:

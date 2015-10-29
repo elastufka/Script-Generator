@@ -97,7 +97,7 @@ if 1 :
     import xml.etree.ElementTree as ET
     import scipy.constants
     import OT_info 
-    import project_info_working as project_info 
+    import project_info
     import fill_README
 
     if (os.getenv('CASAPATH') is not None):

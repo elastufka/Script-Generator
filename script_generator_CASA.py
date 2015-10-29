@@ -98,7 +98,7 @@ def get_parameters(project_dict=False, OT_dict=False):
     stuff=li.getNumbers()
     nspws = stuff[0]
     scifld=stuff[1].tolist()
-    print scifld
+    #print scifld
     cell = stuff[2]
     spwdict = li.getSpwInfo(science_root, namespaces, nspws)
     rfreqHz = li.getRestFreq(science_root, namespaces)
@@ -117,7 +117,7 @@ def get_parameters(project_dict=False, OT_dict=False):
     pc = li.getPhasecenter(science_root, namespaces)
     lastfield = scifld[len(scifld)-1]
 
-    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': scifld,'scifield0': str(scifld[0]), 'scifield1': str(lastfield), 'cellsize': cell[0], 'imsize':str(cell[1]), 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
+    parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': ','.join(map(str,scifld)),'scifield0': str(scifld[0]), 'scifield1': str(lastfield), 'cellsize': cell[0], 'imsize':str(cell[1]), 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
     return parameters
 
 #########################################
@@ -125,7 +125,6 @@ def get_parameters(project_dict=False, OT_dict=False):
 #########################################
 
 def sort_spws(parameters): 
-
     # fix the indices if the project contains multiple ms's or was combined earlier:
     try:
         os.chdir('Imaging')
@@ -162,7 +161,7 @@ def sort_spws(parameters):
     lineinfo = []
 
     for n in range(0,len(parameters['spw_dict'])): #nspws:
-        if parameters['spw_dict'][n]['transition'] == 'Manual_window':
+        if parameters['spw_dict'][n]['transition'] == 'Manual_window': #what if this means no contspws?
             manual_window = raw_input('Spw %s is designated as a manual window. Please look at the proposal to determine if it should be treated as a line or continuum spw. If you would like to treat it as a line window, please enter the transition if possible. Otherwise, type "line". If you would like to treat it as continuum, please type "continuum" or press enter.' % str(n)) or 'continuum' 
             if manual_window == 'continuum':
                 parameters['spw_dict'][n]['transition'] = 'continuum'
@@ -214,27 +213,23 @@ def sort_spws(parameters):
             width = width + ',' + width0 
             widthall = widthall + ',' + widthall0
 
-    if contspws != '': # continuum subtraction is going to change the indices so fix them here. Yay.
+    if (contspws != '' or contspws != spwall): # continuum subtraction is going to change the indices so fix them here. Yay.
         line_spws_per_eb = len(lineinfo) #line spws per eb
 
-    for n in range(0, len(lineinfo)):
-        lineinfo[n]['spw_index'] = str(n) # do something clever
-        try:
-            if factor: #multiple eb's ... this might be an unbound local error in case of single eb, test.
-                for j in range(1, factor):
-                    lineinfo[n]['spw_index'] = lineinfo[n]['spw_index'] + ',' + str(n + line_spws_per_eb*j)
-        except UnboundLocalError:
-            pass
-        # update plotms commands
-        lineinfo[n]['plotcmd'] = li.genPlotMS(lineinfo[n], parameters['rframe'], lineinfo[n]['spw_index'])
-        lineinfo[n]['restfreq'] = "restfreq = '" + lineinfo[n]['restfreq'] + "GHz'\n"
-
-    if width == '': # if no continuum-dedicated spws, just put all of them in the arguments and add a comment to contspws:
-        width = widthall
-        contspws =  spwall #+ "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n" #maybe put this somewhere else...
+        for n in range(0, len(lineinfo)):
+            lineinfo[n]['spw_index'] = str(n) # do something clever
+            try:
+                if factor: #multiple eb's ... this might be an unbound local error in case of single eb, test.
+                    for j in range(1, factor):
+                        lineinfo[n]['spw_index'] = lineinfo[n]['spw_index'] + ',' + str(n + line_spws_per_eb*j)
+            except UnboundLocalError:
+                pass
+            # update plotms commands
+            lineinfo[n]['plotcmd'] = li.genPlotMS(lineinfo[n], parameters['rframe'], lineinfo[n]['spw_index'])
+            lineinfo[n]['restfreq'] = "restfreq = '" + lineinfo[n]['restfreq'] + "GHz'\n"
 
     continfo = {'cont_index': contspws, 'width': width, 'widthall': widthall, 'spwall': spwall}
-    print continfo, lineinfo, linespw
+    #print continfo, lineinfo, linespw
     return continfo, lineinfo, linespw
 
 #########################################
@@ -295,7 +290,10 @@ def make_continuum(script, parameters, project_dict, continfo, comments, flagcha
     width = continfo['width']
     widthall = continfo['widthall']
     if continfo['cont_index'] == continfo['spwall']:
-        contspws = "contspws = '" + continfo['cont_index'] + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n"
+        contspws = "contspws = '" + continfo['cont_index']
+    elif continfo['cont_index'] == '':
+        contspws = "contspws = '" + continfo['spwall'] + "' # Because there are no continuum-dedicated spws, all of the spws are included. You will need to flag out line emission before proceeding. \n\n"
+        width=widthall
     else:
         contspws = "contspws = '" + continfo['cont_index'] + "'\n"
     spwall = continfo['spwall']
@@ -322,7 +320,6 @@ def make_continuum(script, parameters, project_dict, continfo, comments, flagcha
     else:
         script = script + contspws + sc.flags() + flagchannels + sc.flagdata() + sc.contvis() + splitcomplete + sc.flagrestore() + sc.plotuv()
 
-
     return script
 
 def image_setup(script,parameters, comments):
@@ -331,6 +328,7 @@ def image_setup(script,parameters, comments):
     if len(parameters['scifields']) == 1:
         field = "field = '" + parameters['scifield0'] + "'\n"
     else:
+        print 'WARNING: This is not designated as a mosaic but there are multiple science fields. Check the script carefully!'
         field = "field = '" + parameters['scifields'] + "'\n"
     if parameters['mosaic'] == 'true':
         imgmode = "imagermode='mosaic'\n"
@@ -339,7 +337,7 @@ def image_setup(script,parameters, comments):
         field = "field = '" + parameters['scifield0'] + "~" + parameters['scifield1']+ "'\n"
     else:
 	imgmode = "imagermode='csclean'\n"
-
+    #print parameters['mosaic'], parameters['scifields'], field
     cell = "cell='" + parameters['cellsize'] + "'\n" # cell size for imaging.
     imsize = 'imsize =' + '[' + parameters['imsize'] + ',' + parameters['imsize'] + '] \n'
 

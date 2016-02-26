@@ -213,7 +213,7 @@ for vis in vislist:\n\
 # Flag the offending data. See flagdata help for more info.\n\
 #flagdata(vis='',mode='manual',action='apply',flagbackup=False)\n\n\
 # If you need to restore original flags, use the following command.\n\
-#flagmanager(vis='',mode='restore',versionname='original_flags')"
+#flagmanager(vis='',mode='restore',versionname='original_flags')\n"
     return flag_bad_data
 
 def regrid():

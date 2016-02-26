@@ -32,63 +32,6 @@
 #########################################
 # functions: 
 
-#	getnum_ms(project_path, alias)
-#           returns the number of ms's in the folder
-
-#       getListobs()
-#	    gets information from listobs, etc by running casa_stuff.py in CASA
-
-#	getNspw(lines, index)
-#	    returns the number of spws and an integer array of their indexes
-
-#	getCell(lines, index)
-#	    returns cell size and image size recommended by au.pickCellSize
-
-#	getScienceFields(lines, index)
-#	    returns the first and last index of the science fields
-    
-#	getLines(index, numspws)
-#	    returns lines from the listobs that have to do with the spws
-
-#	getSpwInfo(science_root, namespaces, spws)
-#	    returns a dictionary containing information on each spw's rest frequency, transition, and number of channels
-
-#	getRestFreq(science_root, namespaces)
-#	    returns the representative frequency in Hz 
-
-#	getVelWidth(science_root,namespaces, rfreqHz=False)
-#	    converts the bandwidth for sensitivity to velocity units. Returns velocity width, bandwidth for sensitivity and unit
-
-#	getRefFrame(science_root, namespaces)
-#	    returns the reference frame of the source
-
-#	genPlotMS(spwinfo, rframe)
-#	    returns plotms commands for velocity transformations in line spws
-
-#	mosaicBool(namespaces, projroot, sg)
-#	    returns a boolean telling whether the project is a mosaic or not
-
-#	ismosaic(projroot, namespaces, sg, lastfield, firstfield)
-#	    returns strings with information about whether a project is a mosaic and the number of pointings.
-
-#	sourceName(science_root, namespaces)
-#	    returns name of the science target
-
-#	openFile()
-#	    opens imaging_parameters.txt in /calibrated/ directory
-
-#	fillInfo(p)
-#	    puts the dictionary information in easy-to-use text
-
-#	writeText(param, info)
-#	    writes text to file
-
-#	testmain()
-#	    tests the program with a predefined dictionary
-    
-#	main()
-#	   runs everything
-
 ######################################### 
 if 1 :
     import os
@@ -100,7 +43,7 @@ if 1 :
     import project_info
     import fill_README
 
-    if (os.getenv('CASAPATH') is not None):
+    if (os.getenv('CASAPATH') is not None): # this is the magic that makes python in CASA happen! could probably trim down so only imports the tasks you need
         from taskinit import *
       
 #######################
@@ -109,12 +52,13 @@ if 1 :
 
 # find if there are multiple ms's 
 def getnum_ms(project_type, project_path):
+    """returns the number of ms's in the folder"""
     if project_type == "Imaging":
         os.chdir('%s/sg_ouss_id/group_ouss_id/member_ouss_id/calibrated' % project_path)
     else:
         os.chdir('%s/Imaging' % project_path)
     vislist=glob.glob('*.ms.split.cal')
-    if not vislist:
+    if not vislist: #shouldn't happen any more
         vislist = glob.glob('calibrated.ms')
     nms = len(vislist)
     if nms == 0:
@@ -122,10 +66,11 @@ def getnum_ms(project_type, project_path):
     return nms
 
 def getNumbers():
+    """Get number of spws, number of science fields, and recommended cell and image size """
     vislist=glob.glob('*.ms.split.cal')
     from analysisUtils import pickCellSize
-    if not vislist:
-        vislist=['calibrated.ms'] # in case of a manual reduction that was combined in Combination/calibrated
+    #if not vislist:
+    #    vislist=['calibrated.ms'] # in case of a manual reduction that was combined in Combination/calibrated -> this doesn't happen any more
     for vis in vislist:
         try:
             msmd.open(vis)
@@ -138,7 +83,8 @@ def getNumbers():
     return nspws,sfields,cell
 
 # spw info 
-def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw dictionary....
+def getSpwInfo(science_root, namespaces, spws): 
+    """Make a dictionary of all information pertaining to an spw"""
     spwprint = 'You have no continuum-dedicated spws. \n' # default
     #get the right 'SpectralSpec' block...don't want the pointing one! <sbl:name>HCN v=0 J=1-0 Science setup_1</sbl:name>
     spectralspec = science_root.findall('.//sbl:SpectralSpec/', namespaces)
@@ -165,7 +111,7 @@ def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw di
 
     # if calibrated.ms instead of .ms.split.cal ... data may have been combined before. 
     #os.chdir('../') #hope this doesn't mess anything up....
-    if os.path.isdir('calibrated.ms'): 
+    if os.path.isdir('calibrated.ms'): # shouldn't happpen any more
         print 'WARNING: Your data have been combined into a single ms from multiple executions, resulting in %s spws. Please check the resulting script carefully!' % str(len(spws))
         aa = spwtype
         bb = spwrfreq
@@ -195,8 +141,9 @@ def getSpwInfo(science_root, namespaces, spws): # let's put stuff into an spw di
         #IPython.embed()
     return spwdict
 
-# get rest frequency
+
 def getRestFreq(science_root, namespaces):
+    """get rest frequency of representative window"""
     rfreq = science_root.find('.//sbl:SchedulingConstraints/sbl:representativeFrequency',namespaces)
     rfrequnit = rfreq.attrib
     if rfrequnit['unit'] == 'GHz':
@@ -207,6 +154,7 @@ def getRestFreq(science_root, namespaces):
 
 # get velocity width - restructure that if statement
 def getVelWidth(science_root,namespaces, rfreqHz=False):
+    """Get requested width for sensitivity in km/s"""
     rwidth = science_root.find('.//sbl:ScienceParameters/sbl:representativeBandwidth',namespaces)
     rwidthunit = rwidth.attrib
     if rwidthunit['unit'] == 'MHz':
@@ -216,21 +164,22 @@ def getVelWidth(science_root,namespaces, rfreqHz=False):
     elif rwidthunit['unit'] == 'KHz':
         rwidthHz = float(rwidth.text)*1e3
     elif rwidthunit['unit'] == 'm/s':
-        vwidth = rwidth.text
+        vwidth = rwidth.text*(1e-3) # let's go to km/s
+        rwidthunit['unit'] == 'km/s'
     elif rwidthunit['unit'] == 'km/s':
         vwidth = rwidth.text
 
     # convert bandwidth to sensitivity to velocity units if that hasn't already been done - does this depend on reference frmae?
     if (rwidthunit['unit'] != 'm/s' or rwidthunit['unit'] != 'km/s'):
         if rfreqHz !=False:
-            vwidth = (scipy.constants.c/rfreqHz)*rwidthHz # m/s
+            vwidth = (scipy.constants.c/rfreqHz)*rwidthHz*(1e-3) # go to km/s 
         else: 
             print 'Please specify the rest frequency in Hz'
             vwidth = '1' #not 0 just in case
     return vwidth, rwidthHz, rwidthunit['unit']
 
-# get reference frame
 def getRefFrame(science_root, namespaces):
+    """ get reference frame"""
     query = science_root.findall('.//sbl:FieldSource/sbl:isQuery',namespaces)
     sv = science_root.findall('.//sbl:FieldSource/sbl:sourceVelocity',namespaces)
     for n in range(0,len(query)):
@@ -246,10 +195,10 @@ def getRefFrame(science_root, namespaces):
         rframe = rframe.upper()
     return rframe
 
-# generate plotms commands for each line spw to help with picking start and nchan
 # if the ms is combined, have to modify the spw argument
 # maybe generate these in the script generator instead
 def genPlotMS(spwinfo, rframe, spw):
+    """generate plotms commands for each line spw to help with picking start and nchan """
     for n in range(0,len(spwinfo)):
         if spwinfo['transition'] != 'continuum':
         #if not spw: # do we actually need this? if generating the commands in sg.line_image()
@@ -259,7 +208,8 @@ def genPlotMS(spwinfo, rframe, spw):
     return plotcmd
 
 # yet another attempt at getting a reliable mosaic indicator .... seems like the best thing to do is count the pointings, since ismosaic is always true
-def mosaicBool(namespaces, science_root, sourceName):   
+def mosaicBool(namespaces, science_root, sourceName): 
+    """Returns a boolean value that tells you if it is a mosaic or not"""  
     query = science_root.findall('.//sbl:FieldSource/sbl:isQuery',namespaces) # if false that's the science target 
     pattern = science_root.findall('.//sbl:FieldSource/sbl:PointingPattern',namespaces)
     for n in range(0,len(query)):
@@ -280,6 +230,7 @@ def mosaicBool(namespaces, science_root, sourceName):
     return mosaicbool
 
 def ismosaic(projroot, namespaces, sg,lastfield, firstfield):
+    """Old menthod for finding if it is a mosaic ... not used by script generator"""
     mosaic = projroot.findall('.//prj:ScienceGoal/prj:TargetParameters/prj:isMosaic',namespaces)
     if mosaic[int(sg)].text == 'true' :
         isMosaic = ''
@@ -292,9 +243,7 @@ def ismosaic(projroot, namespaces, sg,lastfield, firstfield):
     return isMosaic, pointings
 
 def getPhasecenter(science_root, namespaces):
-    #from astropy import units as u
-    #from astropy.coordinates import SkyCoord
-    # get source coordinates for science field
+    """Get the phase center of a mosaic"""
     sourceLong = science_root.findall('.//sbl:FieldSource/sbl:sourceCoordinates/val:longitude',namespaces)
     sourceLat = science_root.findall('.//sbl:FieldSource/sbl:sourceCoordinates/val:latitude',namespaces)
     system = science_root.findall('.//sbl:FieldSource/sbl:sourceCoordinates',namespaces)
@@ -311,6 +260,7 @@ def getPhasecenter(science_root, namespaces):
     return phasecenter
  
 def sourceName(science_root, namespaces, SB_name):
+    """Get the name of the source. Defaults to SB name if no source name found."""
     sourcenames = science_root.findall('.//sbl:FieldSource/sbl:sourceName',namespaces)
     name = science_root.findall('.//sbl:FieldSource/sbl:name',namespaces) # if false that's the science target ... or name = Primary:
     for n in range(0,len(sourcenames)):
@@ -330,12 +280,9 @@ def sourceName(science_root, namespaces, SB_name):
 #######################
 # write to image_parameters.txt
 #######################
-# go to directory
-#if project_path[len(project_path)-1] != '/': 
-#    project_path = project_path + '/'
 
-#os.chdir(project_path + '%s-analysis/sg_ouss_id/group_ouss_id/member_ouss_id/calibrated' % alias)
 def openFile():
+    """For writing list_imparameters.txt. Not used any more since the script generator is better."""
     import stat
     if os.path.isfile('imaging_parameters.txt') != True:
         mode = 0666|stat.S_IRUSR
@@ -345,6 +292,7 @@ def openFile():
     return param
 
 def fillInfo(p): #pass the whole dictionary
+    """For writing list_imparameters.txt. Not used any more since the script generator is better."""
     info = []
     info.append('Project code: ' + p['project_number'] + '\n')
     info.append('SB name: ' + p['SB_name'] + '\n')
@@ -383,12 +331,14 @@ def fillInfo(p): #pass the whole dictionary
     return info
 
 def writeText(param, info):
+    """For writing list_imparameters.txt. Not used any more since the script generator is better."""
     param.writelines(info)
     param.close()
 
 #######################
 
 def main(project_dict=False, OT_dict=False):
+    """For writing list_imparameters.txt. Not used any more since the script generator is better."""
     #if project_dict == False:
     #    project_dict = project_info.main()
     #if OT_dict == False:

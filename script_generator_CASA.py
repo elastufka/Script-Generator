@@ -23,21 +23,6 @@
 #########################################
 # functions: 
 
-#	get_parameters(project_dict=False, OT_dict=False)
-#	    gets the parameter dictionary from list_imparameters.py
-
-
-# command definition functions:
-#	check_casa():
-#	    defines commands that check the CASA version
-
-# script generation functions:
-#	script_data_prep(parameters)
-#	    write the data prepration portion of the script
-
-#	make_continuum(script, parameters, project_dict)
-#	    write the data prepration portion of the script
-
 #	image_setup(script,parameters)
 #	    write the imaging control parameters portion of the script
 
@@ -82,8 +67,9 @@ import static_commands as sc
 #####################
 
 def get_parameters(project_dict=False, OT_dict=False):
+    """gets the parameter dictionary from list_imparameters_CASA.py """
     if project_dict == False:
-        project_dict = pi.main()
+        project_dict = pi.main() #will query the user for project details. Should never happen when running the generate() method, this is mainly for testing purposes
     if OT_dict == False:
 	OT_dict = OT_info.getOTinfo(project_dict['SB_name'])
     XMLroots=OT_dict[1]
@@ -93,7 +79,6 @@ def get_parameters(project_dict=False, OT_dict=False):
     stuff=li.getNumbers()
     nspws = stuff[0]
     scifld=stuff[1].tolist()
-    #print scifld
     cell = stuff[2]
     spwdict = li.getSpwInfo(science_root, namespaces, nspws)
     rfreqHz = li.getRestFreq(science_root, namespaces)
@@ -110,20 +95,17 @@ def get_parameters(project_dict=False, OT_dict=False):
 
     # fill dictionary
     pc = li.getPhasecenter(science_root, namespaces)
-    lastfield = scifld[len(scifld)-1]
+    lastfield = scifld[scifld.rfind(',')+1:]
 
     parameters = {'project_number': project_dict['project_number'],'SB_name': project_dict['SB_name'],'nms':nms,'mosaic': mosaic, 'scifields': ','.join(map(str,scifld)),'scifield0': str(scifld[0]), 'scifield1': str(lastfield), 'cellsize': cell[0], 'imsize':str(cell[1]), 'rframe':rframe, 'vwidth':vwidth[0], 'rwidth': vwidth[1], 'rwidthunit': vwidth[2], 'spw_dict': spwdict, 'rfreq':str(float(rfreqHz)*1e-9), 'plotcmd': '', 'sourceName': sName, 'phasecenter': pc, 'AOT': AOT}
     return parameters
 
-#########################################
-# deal with all the spw nonsense at once
-#########################################
-
 def sort_spws(parameters): 
+    """Deals with all the spw nonsense at once - type, number of channels, change of indices etc"""
     # fix the indices if the project contains multiple ms's or was combined earlier:
     try:
         os.chdir('Imaging')
-        if os.path.isdir('calibrated.ms') == True:
+        if os.path.isdir('calibrated.ms') == True: #shouldn't happen anymore
             os.chdir('../')
             calfolders = glob.glob('Calibration*')
             factor = len(calfolders)
@@ -154,8 +136,8 @@ def sort_spws(parameters):
     spwall = []
     linespw = []
     lineinfo = []
-
-# 11/2 widths don't adjust when manual window used...
+    
+    #now let's identify if the spws are line or continuum
     for n in range(0,len(parameters['spw_dict'])): #nspws:
         if parameters['spw_dict'][n]['transition'] == 'Manual_window': #what if this means no contspws?
             manual_window = raw_input('Spw %s is designated as a manual window. Please look at the proposal to determine if it should be treated as a line or continuum spw. If you would like to treat it as a line window, please enter the transition if possible. Otherwise, type "line". If you would like to treat it as continuum, please type "continuum" or press enter.' % str(n)) or 'continuum' 
@@ -175,7 +157,7 @@ def sort_spws(parameters):
             lineinfo.append({'spw_index': spw_index, 'restfreq': parameters['spw_dict'][n]['restfreq'], 'plotcmd': '', 'transition': transname})
         spwall.append(parameters['spw_dict'][n]['index'])
         widthall.append(parameters['spw_dict'][n]['nchan'])
-    print parameters['spw_dict']
+
     #nasty string operations
     width = ', '.join(map(str, width))
     widthall = ', '.join(map(str, widthall))
@@ -202,7 +184,7 @@ def sort_spws(parameters):
     linespw = ', '.join(map(str, linespw)) 
     linespw = "linespw = '" + linespw + "'\n" # this is the line you feed into uvcontsub as the list of spws to do subtraction on.
 
-    if (parameters['nms'] > 1 or os.path.isdir('calibrated.ms') == True): # if multiple executions, need to fix widths 
+    if (parameters['nms'] > 1 or os.path.isdir('calibrated.ms') == True): # if multiple executions, need to fix width argument to repeat itself nms times
         width0 = width
         widthall0 = widthall
         for n in range(0, factor-1):
@@ -220,12 +202,12 @@ def sort_spws(parameters):
                         lineinfo[n]['spw_index'] = lineinfo[n]['spw_index'] + ',' + str(n + line_spws_per_eb*j)
             except UnboundLocalError:
                 pass
-            # update plotms commands
+            # update plotms commands to have the correct spw index number
             lineinfo[n]['plotcmd'] = li.genPlotMS(lineinfo[n], parameters['rframe'], lineinfo[n]['spw_index'])
             lineinfo[n]['restfreq'] = "restfreq = '" + lineinfo[n]['restfreq'] + "GHz'\n"
 
     continfo = {'cont_index': contspws, 'width': width, 'widthall': widthall, 'spwall': spwall}
-    #print continfo, lineinfo, linespw
+
     return continfo, lineinfo, linespw
 
 #########################################
@@ -233,7 +215,7 @@ def sort_spws(parameters):
 #########################################
 
 def script_data_prep(parameters, project_dict, comments, template):
-
+    """Write the data prepration portion of the script ie scriptForImaging_Prep.py contents"""
     # some short commands we'll need:
     singleex = "concatvis = vislist[0]\n"
     multipleex = "concatvis='calibrated.ms'\n"
@@ -293,6 +275,7 @@ os.system('cp -ir calibrated_final.ms calibrated_final.ms.backup')\n\n"
     return script
 
 def make_continuum(script, parameters, project_dict, continfo, comments, template, flagchannels):
+    """Write the make a continuum ms portion of the script"""
     width = continfo['width']
     widthall = continfo['widthall']
     if continfo['cont_index'] == continfo['spwall']:
@@ -314,14 +297,15 @@ def make_continuum(script, parameters, project_dict, continfo, comments, templat
         splitcomplete = sc.splitcont()  + "      width=[" + width + "], # widths for all the spws are [" + widthall + "]\n      datacolumn='data')\n\n"
     else: # use all the spws, not just continuum-dedicated:
         flagchannels = "\n# Flag the 'line channels'\nflagchannels = '" + flagchannels + "'#In this example , spws 2&3 have a line between channels 1201 and\n\
-# 2199 and spectral windows 0 and 1 are line-free.\n\n"
+# 2199 and spectral windows 0 and 1 are line-free.\n\n" #for the future it may be possible to steal hifa_flagchannels output to find these channels
         contspws = "contspws = '" + spwall + "'\n"
         splitcomplete = sc.splitcont()  + "      width=[" + widthall + "], # widths for all the spws are [" + widthall + "]\n      datacolumn='data')\n\n"
 
-    # 4.4 fixes....
+    # >= 4.4 fixes....
     initweights = "initweights(vis=finalvis,wtmode='weight',dowtsp=True)\n\n"
     checkweights = "plotms(vis=contvis, yaxis='wtsp',xaxis='freq',spw='',antenna='DA42',field='%s')\n" % parameters['scifield0'] # how to get the antenna?
-    if project_dict['project_type'] == 'Manual':
+    casa_version = int(project_dict['casa_version'].replace('.','0')) # replace dots with zeros and convert to int
+    if project_dict['project_type'] == 'Manual' or casa_version >= 40400: # or casa version >= 4.4.0
         splitcomplete = sc.splitcont2() + "      width=[" + width + "], # widths for all the spws are [" + widthall + "]\n      datacolumn='data')\n\n"
         script = script + contspws + initweights + sc.flags() + flagchannels + sc.flagdata() + sc.plotspw() + sc.contvis() + splitcomplete + sc.flagrestore() + checkweights + sc.plotuv()
     elif template == True:
@@ -332,6 +316,7 @@ def make_continuum(script, parameters, project_dict, continfo, comments, templat
     return script
 
 def image_setup(script,parameters, comments, template):
+    """write the imaging control parameters portion of the script"""
     weights = "weighting = 'briggs'\nrobust=0.5\nniter=1000\nthreshold = '0.0mJy'\n"
 
     if len(parameters['scifields']) == 1:
@@ -352,13 +337,14 @@ def image_setup(script,parameters, comments, template):
     imsize = 'imsize =' + parameters['imsize'] + '\n'
 
     if comments == False:
-         script = script + com.source_param_header() + field + imgmode + cell + imsize + weights
+       script = script + com.source_param_header() + field + imgmode + cell + imsize + weights
     else:
        script = script + com.source_param() + field + imgmode+ com.cellcalc() + cell + imsize + com.imcontrol() + weights
   
     return script
 
 def cont_image(script,parameters, comments, template, mask = False): # what about multiple targets in one SB?
+    """write the portion of the script that makes the continuum image"""
     if parameters['mosaic'] == 'true':
         if not mask:
             clean = sc.mosaic_cont_clean()
@@ -376,7 +362,8 @@ def cont_image(script,parameters, comments, template, mask = False): # what abou
         script = script + com.im_cont() + sc.contvis() + sc.contimagename() + sc.rmtables() + clean + com.cont_rms()
     return script
 
-def contsub(script,parameters, continfo, linespw, comments, fitspw = False): # this is going to change all your spw indices if you do it...
+def contsub(script,parameters, continfo, linespw, comments, fitspw = False): # this is going to change all your spw indices if you do it, but that was fixed in sort_spws
+    """write the portion of the script that does uvcontsub"""
 
     finalvis = "finalvis='calibrated_final.ms'\n"
     
@@ -388,7 +375,7 @@ def contsub(script,parameters, continfo, linespw, comments, fitspw = False): # t
           fitorder=1,\n\
           want_cont=False) # This value should not be changed.\n\n"
 
-    if fitspw:
+    if fitspw: #for the future in case it's possible to steal hifa_flagchannels output to do continuum flagging
         fitspw = "fitspw = '" + fitspw + "'\n"
     else:
         fitspw = "fitspw ='" + continfo['spwall'] + "' # example only\n\n" # should I put contspws here?
@@ -401,6 +388,8 @@ def contsub(script,parameters, continfo, linespw, comments, fitspw = False): # t
 
 
 def line_image(script,parameters, lineinfo, comments):# what about multiple targets in one SB?
+    """write the portion of the script that makes the line images"""
+
     # some short commands
     finalv="finalvis = 'calibrated_final.ms'\n"
     linev = "linevis = finalvis + '.contsub'\n" 
@@ -411,7 +400,7 @@ def line_image(script,parameters, lineinfo, comments):# what about multiple targ
 width='" + str(parameters['vwidth']) + "km/s' \n\
 nchan = -1  \n\
 outframe='" + parameters['rframe'] +"' \n\
-veltype='radio'\n\n" #should be in km/s now .... check
+veltype='radio'\n\n" 
 
     if parameters['mosaic'] == 'true':
         lineclean = sc.mosaic_line_clean()
@@ -432,14 +421,12 @@ veltype='radio'\n\n" #should be in km/s now .... check
     return script
 
 def pbcor_fits(script):
+    """write the portion of the script that does the primary beam correction and exports the files to fits"""
     script = script + com.pbcor() + sc.pbcor() + com.export() + sc.fits() + com.analysis()
     return script
 
-###################################
-# write the script
-####################################
-
 def write_script(script, project_dict, template, filename=False):
+    """Writes the scripts"""
     import stat
     #os.chdir("/lustre/naasc/elastufk/Imaging/test/") #script directory ... /calibrated or Imaging/
     project_path = project_dict['project_path']
@@ -465,21 +452,25 @@ def write_script(script, project_dict, template, filename=False):
     imscript.close()
     print '\n\nYour ' + filename + ' is in ' + os.getcwd()
 
-def gen_template(project_path): # is it easier just to make a dummy parameters dictionary?
+'''
+def gen_template(project_path): # is it easier just to make a dummy parameters dictionary? yes it is..
     os.chdir(project_path)
     project_dict = {'project_path': project_path, 'project_type': 'Imaging', 'casa_version': '4.4.0'} #version for testing only
     vishead = "vishead(vis=concatvis)\n"
     script = com.header() + sc.check_casa_default + com.glob_list()  + sc.get_vislist(project_dict) + com.pointing() + sc.pointing_table() + com.combine() + sc.concat_setup() +com.split() + sc.split_options() + vishead + com.vishead() + sc.split_science() + com.check_split() + sc.checksplit() + com.regrid() + sc.regrid() + sc.backup() # data prep part
     script = script + com.im_template() + sc.finalvis() + sc.plotspw()
     write_script(script,project_dict, template = True)
+'''
 
 def template_parameters():
+    """Get the parameter dictionary for the script template"""
     spwdict = [{'index': '0', 'nchan': '128', 'restfreq': '111', 'transition':'continuum' },{'index': '1', 'nchan': '128', 'restfreq': '222', 'transition': 'continuum'},{'index': '2', 'nchan': '3840', 'restfreq': '115.27120', 'transition': 'CO10'},{'index': '3', 'nchan': '3840', 'restfreq': '115.27120', 'transition': 'CO10'}]
     parameters = {'nms':1,'mosaic': 'true', 'scifields': '0', 'scifield0': '0', 'scifield1': '0','cellsize': '1arcsec', 'imsize':'128', 'rframe':'bary', 'vwidth':'2', 'spw_dict': spwdict, 'rfreq':'115.27120', 'sourceName': 'n253', 'phasecenter': '3'}
     return parameters
 
 # main method
 def generate(SB_name, project_path = False, comments = True, template=False, split=True): #template to get template, split for generating 2 scripts instead of 1
+    """Main method. Options are: project_path ='directory_where_project_lives', comments=True/False ie verbose or non-verbose, template = True/False, split = True/False ie two scripts or one"""
     if (SB_name == 'Template' or SB_name == 'template'):
         template = True
     if project_path == False:
@@ -496,22 +487,22 @@ def generate(SB_name, project_path = False, comments = True, template=False, spl
         os.chdir(project_path)
         flagchannels=False
         parameters = get_parameters(project_dict = project_dict, OT_dict = OT_dict) #skip up to here
-
     script = script_data_prep(parameters, project_dict, comments, template) 
     if split == True:
         prep_script = script
         script = ''
-        print prep_script
+        #print prep_script
     spws = sort_spws(parameters) #skip this?
     continfo = spws[0] #and this
     lineinfo = spws[1] #and this
     linespws = spws[2] # and this ... but check first
     script = make_continuum(script,parameters, project_dict, continfo, comments, template, flagchannels)
     script = image_setup(script,parameters, comments, template) 
-    script = cont_image(script,parameters, comments, template) #
+    script = cont_image(script,parameters, comments, template) 
     if lineinfo != []:
         script = contsub(script,parameters, continfo, linespws, comments)
         script = line_image(script,parameters, lineinfo, comments)
+        #print parameters['vwidth']
     script = pbcor_fits(script)
     if split == True:
        write_script(prep_script,project_dict, template, filename = 'scriptForImaging_Prep.py')
